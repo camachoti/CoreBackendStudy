@@ -1,0 +1,52 @@
+package com.br.corebackend.api;
+
+import jakarta.validation.ValidationException;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.bind.annotation.*;
+
+import com.br.corebackend.dto.LoginRequestDTO;
+import com.br.corebackend.dto.LoginResponseDTO;
+import com.br.corebackend.dto.RegisterRequestDTO;
+import com.br.corebackend.model.User;
+import com.br.corebackend.repository.UserRepository;
+import com.br.corebackend.security.TokenService;
+
+import java.util.Optional;
+
+@RestController
+@RequestMapping("/auth")
+@RequiredArgsConstructor
+@CrossOrigin(origins = "http://localhost:4200")
+public class AuthController {
+
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final TokenService tokenService;
+
+    @PostMapping("/login")
+    public ResponseEntity<LoginResponseDTO> login(@RequestBody LoginRequestDTO body) {
+        User user = this.userRepository.findByUsername(body.username()).orElseThrow(()-> new ValidationException("user.not.found"));
+        if(passwordEncoder.matches(body.password(), user.getPassword())) {
+            String token = tokenService.generateToken(user);
+            LoginResponseDTO response = new LoginResponseDTO(user.getUsername(), token);
+            return ResponseEntity.ok(response);
+        }
+        return ResponseEntity.badRequest().build();
+    }
+
+    @PostMapping("/register")
+    public ResponseEntity<String> register(@RequestBody RegisterRequestDTO body) {
+        Optional<User> user = this.userRepository.findByUsername(body.username());
+        if(user.isEmpty()) {
+            User newUser = new User();
+            newUser.setUsername(body.username());
+            newUser.setPassword(passwordEncoder.encode(body.password()));
+            userRepository.save(newUser);
+            return ResponseEntity.ok().build();
+        }
+        return ResponseEntity.badRequest().build();
+    }
+
+}
